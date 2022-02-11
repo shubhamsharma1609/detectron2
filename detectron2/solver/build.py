@@ -1,4 +1,10 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Feb 10 15:19:22 2022
+
+@author: SSHUB
+"""
+
 import copy
 import itertools
 import logging
@@ -10,7 +16,7 @@ from fvcore.common.param_scheduler import CosineParamScheduler, MultiStepParamSc
 
 from detectron2.config import CfgNode
 
-from .lr_scheduler import LRMultiplier, WarmupParamScheduler
+from .lr_scheduler import LRMultiplier, WarmupParamScheduler,OneCycle
 
 _GradientClipperInput = Union[torch.Tensor, Iterable[torch.Tensor]]
 _GradientClipper = Callable[[_GradientClipperInput], None]
@@ -83,11 +89,9 @@ def maybe_add_gradient_clipping(
     optimizer type to become a new dynamically created class OptimizerWithGradientClip
     that inherits the given optimizer and overrides the `step` method to
     include gradient clipping.
-
     Args:
         cfg: CfgNode, configuration options
         optimizer: type. A subclass of torch.optim.Optimizer
-
     Return:
         type: either the input `optimizer` (if gradient clipping is disabled), or
             a subclass of it with gradient clipping included in the `step` method.
@@ -143,7 +147,6 @@ def get_default_optimizer_params(
     """
     Get default param list for optimizer, with support for a few types of
     overrides. If no overrides needed, this is equivalent to `model.parameters()`.
-
     Args:
         base_lr: lr for every group by default. Can be omitted to use the one in optimizer.
         weight_decay: weight decay for every group by default. Can be omitted to use the one
@@ -155,11 +158,9 @@ def get_default_optimizer_params(
             (LR, weight decay) for module parameters with a given name; e.g.
             ``{"embedding": {"lr": 0.01, "weight_decay": 0.1}}`` will set the LR and
             weight decay values for all module parameters named `embedding`.
-
     For common detection models, ``weight_decay_norm`` is the only option
     needed to be set. ``bias_lr_factor,weight_decay_bias`` are legacy settings
     from Detectron1 that are not found useful.
-
     Example:
     ::
         torch.optim.SGD(get_default_optimizer_params(model, weight_decay_norm=0),
@@ -275,6 +276,10 @@ def build_lr_scheduler(
         end_value = cfg.SOLVER.BASE_LR_END / cfg.SOLVER.BASE_LR
         assert end_value >= 0.0 and end_value <= 1.0, end_value
         sched = CosineParamScheduler(1, end_value)
+        
+    elif name=="OneCycle":
+        sched=OneCycle(cfg.max_iters)
+        
     else:
         raise ValueError("Unknown LR scheduler: {}".format(name))
 

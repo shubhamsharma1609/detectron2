@@ -1,4 +1,10 @@
-# Copyright (c) Facebook, Inc. and its affiliates.
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Feb 10 13:07:30 2022
+
+@author: SSHUB
+"""
+
 import logging
 import math
 from bisect import bisect_right
@@ -55,11 +61,9 @@ class LRMultiplier(torch.optim.lr_scheduler._LRScheduler):
     learning rate of each param in the optimizer.
     Every step, the learning rate of each parameter becomes its initial value
     multiplied by the output of the given :class:`ParamScheduler`.
-
     The absolute learning rate value of each parameter can be different.
     This scheduler can be used as long as the relative scale among them do
     not change during training.
-
     Examples:
     ::
         LRMultiplier(
@@ -215,14 +219,12 @@ def _get_warmup_factor_at_iter(
     """
     Return the learning rate warmup factor at a specific iteration.
     See :paper:`ImageNet in 1h` for more details.
-
     Args:
         method (str): warmup method; either "constant" or "linear".
         iter (int): iteration at which to calculate the warmup factor.
         warmup_iters (int): the number of warmup iterations.
         warmup_factor (float): the base warmup factor (the meaning changes according
             to the method used).
-
     Returns:
         float: the effective warmup factor at the given iteration.
     """
@@ -236,3 +238,62 @@ def _get_warmup_factor_at_iter(
         return warmup_factor * (1 - alpha) + alpha
     else:
         raise ValueError("Unknown warmup method: {}".format(method))
+        
+    
+        
+    
+    
+class Onecycle(torch.optim.lr_scheduler._LRScheduler):
+    def __init__(
+        self,
+        optimizer: torch.optim.Optimizer,
+        max_iters: int,
+        warmup_factor: float = 0.001,
+        warmup_iters: int = 1000,
+        warmup_method: str = "linear",
+        last_epoch: int = -1,
+        tot_steps=int
+    ):
+        logger.warning(
+            "WarmupCosineLR is deprecated! Use LRMultipilier with fvcore ParamScheduler instead!"
+        )
+        self.max_iters = max_iters
+        self.warmup_factor = warmup_factor
+        self.warmup_iters = warmup_iters
+        self.warmup_method = warmup_method
+        super().__init__(optimizer, last_epoch)
+
+    def get_lr(self) -> List[float]:
+        warmup_factor = _get_warmup_factor_at_iter(
+            self.warmup_method, self.last_epoch, self.warmup_iters, self.warmup_factor
+        )
+        # Different definitions of half-cosine with warmup are possible. For
+        # simplicity we multiply the standard half-cosine schedule by the warmup
+        # factor. An alternative is to start the period of the cosine at warmup_iters
+        # instead of at 0. In the case that warmup_iters << max_iters the two are
+        # very close to each other.
+        lrs=[]
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(self.optimizer, max_lr=0.1,total_steps=self.max_iters,anneal_strategy='linear')
+        for i in range(self.max_iters):
+            self.optimizer.step()
+            lrs.append(self.optimizer.param_groups[0]["lr"])
+            scheduler.step()
+            
+        return lrs*warmup_factor
+        
+
+    def _compute_values(self) -> List[float]:
+        # The new interface
+        return self.get_lr()
+
+
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
